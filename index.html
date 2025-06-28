@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather App</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(to right, #83a4d4, #b6fbff);
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 2rem 0;
+            overflow-x: hidden;
+                    
+            background-color: black;
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-position: center;
+            transition: background-image 0.5s ease-in-out;
+            }
+
+        
+
+        .container {
+            background: white;
+            padding: 2rem 0;
+            border-radius: 20px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            width: 90%;
+            max-width: 500px;
+            text-align: center;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 20px;
+            padding: 1rem;
+        }
+
+        .search-box input {
+            padding: 0.5rem;
+            width: 70%;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+        }
+
+        .search-box button {
+            padding: 0.5rem 1rem;
+            border: none;
+            background-color: #3498db;
+            color: white;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+
+        .weather-box img {
+            width: 80px;
+            height: 80px;
+        }
+
+        .forecast {
+            display: flex;
+            flex-direction: row;
+            gap: 1rem;
+            overflow-x: auto;
+            padding: 1rem 0;
+            scroll-snap-type: x mandatory;
+            }
+
+        .forecast-day {
+            flex: 0 0 auto;
+            min-width: 120px;
+            background: #e3f2fd;
+            border-radius: 10px;
+            padding: 1rem;
+            text-align: center;
+            scroll-snap-align: start;
+            }
+
+            
+        .hidden {
+            display: none;
+        }
+
+        .error {
+            color: red;
+        }
+
+        body.dark {
+        background: #121212;
+        color: #ffffff;
+        }
+
+        body.dark .container {
+        background: #1e1e1e;
+        }
+
+        body.dark .forecast-day {
+        background: #2a2a2a;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Weather Forecast</h1>
+        <div class="search-box">
+            <input type="text" id="cityInput" placeholder="Enter city name">
+            <button onclick="getWeather()">Search</button>
+            <button onclick="toggleDarkMode()">Dark Mode</button>
+
+        </div>
+        <div id="weatherInfo" class="weather-box hidden">
+            <h2 id="cityName"></h2>
+            <p>Local Time: <span id="localTime"></span></p>
+            <img id="weatherIcon" src="" alt="Weather Icon">
+            <p id="description"></p>
+            <p><strong>Temperature:</strong> <span id="temp"></span><span id="unit">°C</span></p>
+            <p><strong>Humidity:</strong> <span id="humidity"></span>%</p>
+            <p><strong>Wind:</strong> <span id="wind"></span> km/h</p>
+            <button onclick="toggleUnit()">Switch °C/°F</button>
+        </div>
+        <div id="forecast" class="forecast hidden"></div>
+        <p id="errorMsg" class="error hidden"></p>
+    </div>
+
+    <script>
+        const apiKey = "c737327da962aaea06be749130b2789a";
+        let currentUnit = "metric";
+
+        async function getWeather() {
+            const city = document.getElementById("cityInput").value.trim();
+            const url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=${currentUnit}`;
+            const forecastUrl = `https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${apiKey}&units=${currentUnit}`;
+
+            const errorMsg = document.getElementById("errorMsg");
+            const weatherInfo = document.getElementById("weatherInfo");
+            const forecastDiv = document.getElementById("forecast");
+
+            errorMsg.classList.add("hidden");
+            weatherInfo.classList.add("hidden");
+            forecastDiv.classList.add("hidden");
+
+            try {
+                const [weatherRes, forecastRes] = await Promise.all([
+                    fetch(url),
+                    fetch(forecastUrl)
+                ]);
+
+                if (!weatherRes.ok || !forecastRes.ok) {
+                    throw new Error("City not found");
+                }
+
+                const weatherData = await weatherRes.json();
+                const weatherMain = weatherData.weather[0].main.toLowerCase();
+                const bgImage = ["clear", "clouds", "rain", "snow", "thunderstorm"].includes(weatherMain)
+                ? `${weatherMain}.jpg`
+                : `default.jpg`;
+
+                document.body.style.backgroundImage = `url('${bgImage}')`;
+                document.body.style.backgroundSize = "cover";
+                document.body.style.backgroundRepeat = "no-repeat";
+                document.body.style.backgroundPosition = "center";
+
+
+                const forecastData = await forecastRes.json();
+
+                const timezoneOffset = weatherData.timezone;
+                const localTime = new Date(Date.now() + timezoneOffset * 1000).toUTCString();
+                document.getElementById("localTime").textContent = localTime;
+
+                // Now continue with city name, temp, etc.
+                document.getElementById("cityName").textContent = `${weatherData.name}, ${weatherData.sys.country}`;
+
+                // Current weather
+                document.getElementById("cityName").textContent = `${weatherData.name}, ${weatherData.sys.country}`;
+                document.getElementById("temp").textContent = weatherData.main.temp;
+                document.getElementById("description").textContent = weatherData.weather[0].description;
+                document.getElementById("humidity").textContent = weatherData.main.humidity;
+                document.getElementById("wind").textContent = weatherData.wind.speed;
+                document.getElementById("weatherIcon").src = `https://openweathermap.org/img/wn/${weatherData.weather[0].icon}@2x.png`;
+                document.getElementById("unit").textContent = currentUnit === "metric" ? "°C" : "°F";
+
+                weatherInfo.classList.remove("hidden");
+
+                // 5-Day Forecast (every 24 hours)
+                const forecastHtml = forecastData.list.filter((_, i) => i % 8 === 0).map(f => {
+                    const date = new Date(f.dt * 1000);
+                    return `
+                        <div class="forecast-day">
+                            <h4>${date.toDateString().slice(0, 10)}</h4>
+                            <img src="https://openweathermap.org/img/wn/${f.weather[0].icon}@2x.png" alt="icon">
+                            <p>${f.weather[0].description}</p>
+                            <p><strong>${f.main.temp} ${currentUnit === "metric" ? "°C" : "°F"}</strong></p>
+                        </div>
+                    `;
+                }).join("");
+
+                forecastDiv.innerHTML = forecastHtml;
+                forecastDiv.classList.remove("hidden");
+
+            } catch (error) {
+                errorMsg.textContent = error.message;
+                errorMsg.classList.remove("hidden");
+            }
+        }
+
+        function toggleUnit() {
+            currentUnit = currentUnit === "metric" ? "imperial" : "metric";
+            getWeather();
+        }
+
+        function toggleDarkMode() {
+  document.body.classList.toggle('dark');
+}
+
+    </script>
+</body>
+</html>
